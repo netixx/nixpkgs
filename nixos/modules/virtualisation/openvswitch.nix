@@ -36,14 +36,6 @@ in {
         Open vSwitch package to use.
       '';
     };
-
-    ipsec = mkOption {
-      type = types.bool;
-      default = false;
-      description = ''
-        Whether to start racoon service for openvswitch.
-      '';
-    };
   };
 
   config = mkIf cfg.enable (let
@@ -92,6 +84,13 @@ in {
             "${cfg.package}/share/openvswitch/vswitch.ovsschema"
         fi
         chmod -R +w /var/db/openvswitch
+        if ${cfg.package}/bin/ovsdb-tool needs-conversion /var/db/openvswitch/conf.db | grep -q "yes"
+        then
+          echo "Performing database upgrade"
+          ${cfg.package}/bin/ovsdb-tool convert /var/db/openvswitch/conf.db
+        else
+          echo "Database already up to date"
+        fi
         '';
       serviceConfig = {
         ExecStart =
@@ -117,7 +116,7 @@ in {
       '';
     };
 
-    systemd.services.vswitchd = {
+    systemd.services.ovs-vswitchd = {
       description = "Open_vSwitch Daemon";
       wantedBy = [ "multi-user.target" ];
       bindsTo = [ "ovsdb.service" ];
@@ -132,48 +131,12 @@ in {
         PIDFile = "/var/run/openvswitch/ovs-vswitchd.pid";
         # Use service type 'forking' to correctly determine when vswitchd is ready.
         Type = "forking";
+        Restart = "always";
+        RestartSec = 3;
       };
     };
 
   }
-  (mkIf cfg.ipsec {
-    services.racoon.enable = true;
-    services.racoon.configPath = "${runDir}/ipsec/etc/racoon/racoon.conf";
-
-    networking.firewall.extraCommands = ''
-      iptables -I INPUT -t mangle -p esp -j MARK --set-mark 1/1
-      iptables -I INPUT -t mangle -p udp --dport 4500 -j MARK --set-mark 1/1
-    '';
-
-    systemd.services.ovs-monitor-ipsec = {
-      description = "Open_vSwitch Ipsec Daemon";
-      wantedBy = [ "multi-user.target" ];
-      requires = [ "ovsdb.service" ];
-      before = [ "vswitchd.service" "racoon.service" ];
-      environment.UNIXCTLPATH = "/tmp/ovsdb.ctl.sock";
-      serviceConfig = {
-        ExecStart = ''
-          ${cfg.package}/bin/ovs-monitor-ipsec \
-            --root-prefix ${runDir}/ipsec \
-            --pidfile /var/run/openvswitch/ovs-monitor-ipsec.pid \
-            --monitor --detach \
-            unix:/var/run/openvswitch/db.sock
-        '';
-        PIDFile = "/var/run/openvswitch/ovs-monitor-ipsec.pid";
-        # Use service type 'forking' to correctly determine when ovs-monitor-ipsec is ready.
-        Type = "forking";
-      };
-
-      preStart = ''
-        rm -r ${runDir}/ipsec/etc/racoon/certs || true
-        mkdir -p ${runDir}/ipsec/{etc/racoon,etc/init.d/,usr/sbin/}
-        ln -fs ${pkgs.ipsecTools}/bin/setkey ${runDir}/ipsec/usr/sbin/setkey
-        ln -fs ${pkgs.writeScript "racoon-restart" ''
-        #!${pkgs.stdenv.shell}
-        /var/run/current-system/sw/bin/systemctl $1 racoon
-        ''} ${runDir}/ipsec/etc/init.d/racoon
-      '';
-    };
-  })]));
+  ]));
 
 }

@@ -6,20 +6,19 @@ with stdenv.lib;
 
 let
   _kernel = kernel;
-  python = python27.withPackages (ps: with ps; [ six ]);
 in stdenv.mkDerivation rec {
-  version = "2.8.2";
+  version = "2.5.4";
   name = "openvswitch-${version}";
 
   src = fetchurl {
     url = "http://openvswitch.org/releases/${name}.tar.gz";
-    sha256 = "87b4a7e7134a44ce1f808d3415a2244b4518c2b0b2a42fa2f8231e592f13103d";
+    sha256 = "1lji87wg953lqcdf02f1zv2m54vhd2x9jd03bb91lnlb4qlhifiv";
   };
 
   kernel = optional (_kernel != null) _kernel.dev;
 
   nativeBuildInputs = [ pkgconfig ];
-  buildInputs = [ makeWrapper utillinux openssl libcap_ng python
+  buildInputs = [ makeWrapper utillinux openssl libcap_ng python27
                   perl procps which ];
 
   configureFlags = [
@@ -37,12 +36,26 @@ in stdenv.mkDerivation rec {
 
   postBuild = ''
     # fix tests
-    substituteInPlace xenserver/opt_xensource_libexec_interface-reconfigure --replace '/usr/bin/env python' '${python.interpreter}'
-    substituteInPlace vtep/ovs-vtep --replace '/usr/bin/env python' '${python.interpreter}'
+    substituteInPlace xenserver/opt_xensource_libexec_interface-reconfigure --replace '/usr/bin/env python' '${python27.interpreter}'
+    substituteInPlace vtep/ovs-vtep --replace '/usr/bin/env python' '${python27.interpreter}'
   '';
 
   enableParallelBuilding = true;
   doCheck = false; # bash-completion test fails with "compgen: command not found"
+
+  postInstall = ''
+    cp debian/ovs-monitor-ipsec $out/share/openvswitch/scripts
+    makeWrapper \
+      $out/share/openvswitch/scripts/ovs-monitor-ipsec \
+      $out/bin/ovs-monitor-ipsec \
+      --prefix PYTHONPATH : "$out/share/openvswitch/python"
+    substituteInPlace $out/share/openvswitch/scripts/ovs-monitor-ipsec \
+      --replace "UnixctlServer.create(None)" "UnixctlServer.create(os.environ['UNIXCTLPATH'])"
+    substituteInPlace $out/share/openvswitch/scripts/ovs-monitor-ipsec \
+      --replace "self.psk_file" "root_prefix + self.psk_file"
+    substituteInPlace $out/share/openvswitch/scripts/ovs-monitor-ipsec \
+      --replace "self.cert_dir" "root_prefix + self.cert_dir"
+  '';
 
   meta = with stdenv.lib; {
     platforms = platforms.linux;

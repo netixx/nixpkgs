@@ -13,7 +13,7 @@ let
 
   slaves = concatMap (i: i.interfaces) (attrValues cfg.bonds)
     ++ concatMap (i: i.interfaces) (attrValues cfg.bridges)
-    ++ concatMap (i: i.interfaces) (attrValues cfg.vswitches);
+    ++ concatMap (i: attrNames (filterAttrs (name: config: ! (config.type == "internal" || hasAttr name cfg.interfaces)) i.interfaces)) (attrValues cfg.vswitches);
 
   slaveIfs = map (i: cfg.interfaces.${i}) (filter (i: cfg.interfaces ? ${i}) slaves);
 
@@ -355,6 +355,32 @@ let
 
   };
 
+  vswitchInterfaceOpts = {name, ...}: {
+
+    options = {
+
+      name = mkOption {
+        description = "Name of the interface";
+        example = "eth0";
+        type = types.string;
+      };
+
+      vlan = mkOption {
+        description = "Vlan tag to apply to interface";
+        example = 10;
+        type = types.nullOr types.int;
+        default = null;
+      };
+
+      type = mkOption {
+        description = "Openvswitch type to assign to interface";
+        example = "internal";
+        type = types.nullOr types.string;
+        default = null;
+      };
+    };
+  };
+
   hexChars = stringToCharacters "0123456789abcdef";
 
   isHexString = s: all (c: elem c hexChars) (stringToCharacters (toLower s));
@@ -523,9 +549,8 @@ in
 
           interfaces = mkOption {
             example = [ "eth0" "eth1" ];
-            type = types.listOf types.str;
-            description =
-              "The physical network interfaces connected by the vSwitch.";
+            description = "The physical network interfaces connected by the vSwitch.";
+            type = with types; loaOf (submodule vswitchInterfaceOpts);
           };
 
           controllers = mkOption {
