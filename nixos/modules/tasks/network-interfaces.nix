@@ -531,8 +531,8 @@ in
     networking.vswitches = mkOption {
       default = { };
       example =
-        { vs0.interfaces = [ "eth0" "eth1" ];
-          vs1.interfaces = [ "eth2" "wlan0" ];
+        { vs0.interfaces = { eth0 = { }; lo1 = { type="internal"; }; };
+          vs1.interfaces = [ { name = "eth2"; } { name = "lo2"; type="internal"; } ];
         };
       description =
         ''
@@ -573,6 +573,23 @@ in
               loaded with <literal>ovs-ofctl</literal> within one atomic operation.
             '';
           };
+          # TODO: provide list of openflow protocols and check that openFlowVersion is included in supportedOpenFlowVersions
+          supportedOpenFlowVersions = mkOption {
+            type = types.listOf types.str;
+            example = [ "OpenFlow10" "OpenFlow13" "OpenFlow14" ];
+            default = [ "OpenFlow13" ];
+            description = ''
+              Supported versions to enable on this switch.
+            '';
+          };
+
+          # openFlowVersion = mkOption {
+          #   type = types.str;
+          #   default = "OpenFlow13";
+          #   description = ''
+          #     Version of OpenFlow protocol to use when communicating with the switch internally (e.g. with <literal>openFlowRules</literal>).
+          #   '';
+          # };
 
           extraOvsctlCmds = mkOption {
             type = types.lines;

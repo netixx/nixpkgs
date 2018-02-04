@@ -8,12 +8,12 @@ let
   _kernel = kernel;
   python = python27.withPackages (ps: with ps; [ six ]);
 in stdenv.mkDerivation rec {
-  version = "2.8.2";
+  version = "2.9.2";
   name = "openvswitch-${version}";
 
   src = fetchurl {
     url = "http://openvswitch.org/releases/${name}.tar.gz";
-    sha256 = "87b4a7e7134a44ce1f808d3415a2244b4518c2b0b2a42fa2f8231e592f13103d";
+    sha256 = "90f084dc282fdb588a2cfff351fea359492f69600f1e4a1286e24e44901de113";
   };
 
   kernel = optional (_kernel != null) _kernel.dev;

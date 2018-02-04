@@ -7,12 +7,12 @@ with stdenv.lib;
 let
   _kernel = kernel;
 in stdenv.mkDerivation rec {
-  version = "2.5.4";
+  version = "2.5.5";
   name = "openvswitch-${version}";
 
   src = fetchurl {
     url = "http://openvswitch.org/releases/${name}.tar.gz";
-    sha256 = "1lji87wg953lqcdf02f1zv2m54vhd2x9jd03bb91lnlb4qlhifiv";
+    sha256 = "a7c56ce91546de025e1b2934811657c471f52700981233a176827c22615cfb4a";
   };
 
   kernel = optional (_kernel != null) _kernel.dev;

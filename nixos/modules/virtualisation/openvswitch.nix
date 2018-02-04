@@ -36,6 +36,17 @@ in {
         Open vSwitch package to use.
       '';
     };
+
+    ipsec = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Whether to start racoon service for openvswitch.
+        Supported only if openvswitch version is < 2.6.0.
+        Use <literal>virtualisation.vswitch.package = pkgs.openvswitch-lts</literal>
+        for a version that supports ipsec over GRE.
+      '';
+    };
   };
 
   config = mkIf cfg.enable (let
@@ -137,6 +148,43 @@ in {
     };
 
   }
-  ]));
+  (mkIf (cfg.ipsec && (versionOlder cfg.package.version "2.6.0")) {
+    services.racoon.enable = true;
+    services.racoon.configPath = "${runDir}/ipsec/etc/racoon/racoon.conf";
 
+    networking.firewall.extraCommands = ''
+      iptables -I INPUT -t mangle -p esp -j MARK --set-mark 1/1
+      iptables -I INPUT -t mangle -p udp --dport 4500 -j MARK --set-mark 1/1
+    '';
+
+    systemd.services.ovs-monitor-ipsec = {
+      description = "Open_vSwitch Ipsec Daemon";
+      wantedBy = [ "multi-user.target" ];
+      requires = [ "ovsdb.service" ];
+      before = [ "vswitchd.service" "racoon.service" ];
+      environment.UNIXCTLPATH = "/tmp/ovsdb.ctl.sock";
+      serviceConfig = {
+        ExecStart = ''
+          ${cfg.package}/bin/ovs-monitor-ipsec \
+            --root-prefix ${runDir}/ipsec \
+            --pidfile /var/run/openvswitch/ovs-monitor-ipsec.pid \
+            --monitor --detach \
+            unix:/var/run/openvswitch/db.sock
+        '';
+        PIDFile = "/var/run/openvswitch/ovs-monitor-ipsec.pid";
+        # Use service type 'forking' to correctly determine when ovs-monitor-ipsec is ready.
+        Type = "forking";
+      };
+
+      preStart = ''
+        rm -r ${runDir}/ipsec/etc/racoon/certs || true
+        mkdir -p ${runDir}/ipsec/{etc/racoon,etc/init.d/,usr/sbin/}
+        ln -fs ${pkgs.ipsecTools}/bin/setkey ${runDir}/ipsec/usr/sbin/setkey
+        ln -fs ${pkgs.writeScript "racoon-restart" ''
+        #!${pkgs.runtimeShell}
+        /var/run/current-system/sw/bin/systemctl $1 racoon
+        ''} ${runDir}/ipsec/etc/init.d/racoon
+      '';
+    };
+  })]));
 }

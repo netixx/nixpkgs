@@ -353,7 +353,8 @@ let
             path = [ pkgs.iproute config.virtualisation.vswitch.package ];
             preStart = ''
               echo "Resetting Open vSwitch ${n}..."
-              ovs-vsctl --if-exists del-br ${n} -- add-br ${n}
+              ovs-vsctl --if-exists del-br ${n} -- add-br ${n} \
+                        -- set bridge ${n} protocols=${concatStringsSep "," v.supportedOpenFlowVersions}
             '';
             script = ''
               echo "Configuring Open vSwitch ${n}..."
@@ -362,15 +363,16 @@ let
                 ${concatMapStrings (x: " -- set-controller ${n} " + x)  v.controllers} \
                 ${concatMapStrings (x: " -- " + x) (splitString "\n" v.extraOvsctlCmds)}
 
+
               echo "Adding OpenFlow rules for Open vSwitch ${n}..."
-              ovs-ofctl add-flows ${n} ${ofRules}
+              ovs-ofctl --protocols=${concatStringsSep "," v.supportedOpenFlowVersions} add-flows ${n} ${ofRules}
             '';
             postStop = ''
               echo "Cleaning Open vSwitch ${n}"
               echo "Shuting down internal ${n} interface"
               ip link set ${n} down || true
               echo "Deleting flows for ${n}"
-              ovs-ofctl del-flows ${n} || true
+              ovs-ofctl --protocols=${concatStringsSep "," v.supportedOpenFlowVersions} del-flows ${n} || true
               echo "Deleting Open vSwitch ${n}"
               ovs-vsctl --if-exists del-br ${n} || true
             '';
