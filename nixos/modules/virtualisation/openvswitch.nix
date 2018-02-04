@@ -42,7 +42,7 @@ in {
       default = false;
       description = ''
         Whether to start racoon service for openvswitch.
-        Supported only if openvswitch version is < 2.6.0.
+        Supported only if openvswitch version is less than 2.6.0.
         Use <literal>virtualisation.vswitch.package = pkgs.openvswitch-lts</literal>
         for a version that supports ipsec over GRE.
       '';
