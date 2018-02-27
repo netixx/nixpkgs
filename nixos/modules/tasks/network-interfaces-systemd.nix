@@ -12,7 +12,13 @@ let
     i.ipv4.addresses
     ++ optionals cfg.enableIPv6 i.ipv6.addresses;
 
-  dhcpStr = useDHCP: if useDHCP == true || useDHCP == null then "both" else "none";
+  dhcpStr = useDHCP:
+    if useDHCP == true || useDHCP == null
+    then
+      if cfg.enableIPv6
+      then "yes"
+      else "ipv4"
+    else "no";
 
   slaves =
     concatLists (map (bond: bond.interfaces) (attrValues cfg.bonds))
@@ -48,20 +54,28 @@ in
     systemd.network =
       let
         domains = cfg.search ++ (optional (cfg.domain != null) cfg.domain);
-        genericNetwork = override:
-          let gateway = optional (cfg.defaultGateway != null) cfg.defaultGateway.address
+        defaultGateways = optional (cfg.defaultGateway != null) cfg.defaultGateway.address
             ++ optional (cfg.defaultGateway6 != null) cfg.defaultGateway6.address;
-          in {
+        genericNetwork = override:
+          {
             DHCP = override (dhcpStr cfg.useDHCP);
-          } // optionalAttrs (gateway != [ ]) {
-            gateway = override gateway;
+          } // optionalAttrs (defaultGateways != [ ]) {
+            gateway = override defaultGateways;
           } // optionalAttrs (domains != [ ]) {
             domains = override domains;
           };
+        disableIPv6Opts = optionalAttrs (! cfg.enableIPv6) {
+          # if IPv6 is disabled, we shoud define additionnal attributes
+          # see https://github.com/coreos/bugs/issues/1419
+          networkConfig.LinkLocalAddressing = "no";
+          networkConfig.IPv6AcceptRA = "no";
+        };
       in mkMerge [ {
         enable = true;
-        networks."99-main" = genericNetwork mkDefault;
       }
+      (mkIf (domains  != [ ] || defaultGateways != [ ] || cfg.useDHCP)  {
+        networks."99-main" =  genericNetwork mkDefault;
+      })
       (mkMerge (flip map interfaces (i: {
         netdevs = mkIf i.virtual ({
           "40-${i.name}" = {
@@ -74,14 +88,14 @@ in
             };
           };
         });
-        networks."40-${i.name}" = mkMerge [ (genericNetwork mkDefault) {
+        networks."40-${i.name}" = mkMerge [ (genericNetwork mkDefault) ({
           name = mkDefault i.name;
           DHCP = mkForce (dhcpStr
             (if i.useDHCP != null then i.useDHCP else cfg.useDHCP && interfaceIps i == [ ]));
           address = flip map (interfaceIps i)
             (ip: "${ip.address}/${toString ip.prefixLength}");
           networkConfig.IPv6PrivacyExtensions = "kernel";
-        } ];
+        } // disableIPv6Opts) ];
       })))
       (mkMerge (flip mapAttrsToList cfg.bridges (name: bridge: {
         netdevs."40-${name}" = {
@@ -91,10 +105,10 @@ in
           };
         };
         networks = listToAttrs (flip map bridge.interfaces (bi:
-          nameValuePair "40-${bi}" (mkMerge [ (genericNetwork (mkOverride 999)) {
+          nameValuePair "40-${bi}" (mkMerge [ (genericNetwork (mkOverride 999)) ({
             DHCP = mkOverride 0 (dhcpStr false);
             networkConfig.Bridge = name;
-          } ])));
+          } // disableIPv6Opts) ])));
       })))
       (mkMerge (flip mapAttrsToList cfg.bonds (name: bond: {
         netdevs."40-${name}" = {
@@ -162,10 +176,10 @@ in
         };
 
         networks = listToAttrs (flip map bond.interfaces (bi:
-          nameValuePair "40-${bi}" (mkMerge [ (genericNetwork (mkOverride 999)) {
+          nameValuePair "40-${bi}" (mkMerge [ (genericNetwork (mkOverride 999)) ({
             DHCP = mkOverride 0 (dhcpStr false);
             networkConfig.Bond = name;
-          } ])));
+          } // disableIPv6Opts) ])));
       })))
       (mkMerge (flip mapAttrsToList cfg.macvlans (name: macvlan: {
         netdevs."40-${name}" = {
