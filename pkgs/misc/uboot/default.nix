@@ -162,6 +162,12 @@ in rec {
     filesToInstall = ["u-boot-dtb.bin"];
   };
 
+  ubootOdroidC2 = buildUBoot rec {
+    defconfig = "odroid-c2_defconfig";
+    extraMeta.platforms = ["aarch64-linux"];
+    filesToInstall = ["u-boot.bin"];
+  };
+
   ubootOrangePiPc = buildUBoot rec {
     defconfig = "orangepi_pc_defconfig";
     extraMeta.platforms = ["armv7l-linux"];

@@ -13901,6 +13901,7 @@ with pkgs;
     ubootGuruplug
     ubootJetsonTK1
     ubootOdroidXU3
+    ubootOdroidC2
     ubootOrangePiPc
     ubootPcduino3Nano
     ubootPine64
@@ -13920,6 +13921,10 @@ with pkgs;
   ubootNanonote = callPackage ../misc/uboot/nanonote.nix { };
 
   ubootRock64 = callPackage ../misc/uboot/rock64.nix { };
+
+  fip_create = callPackage ../misc/uboot/fip-create.nix { };
+  bl1-odroid-c2 = callPackage ../misc/uboot/bl1-odroid-c2.nix { };
+  meson-tools = callPackage ../misc/uboot/meson-tools.nix { };
 
   uclibc = callPackage ../os-specific/linux/uclibc { };
 
