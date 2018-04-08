@@ -166,6 +166,25 @@ in rec {
     defconfig = "odroid-c2_defconfig";
     extraMeta.platforms = ["aarch64-linux"];
     filesToInstall = ["u-boot.bin"];
+    version = "2017.09";
+    src = fetchurl {
+      url = "ftp://ftp.denx.de/pub/u-boot/u-boot-${version}.tar.bz2";
+      sha256 = "0i4p12ar0zgyxs8hiqgp6p6shvbw4ikkvryd4mh70bppyln5zldj";
+    };
+    patches = [
+      (fetchpatch {
+        url = https://github.com/dezgeg/u-boot/commit/rpi-2017-11-patch1.patch;
+        sha256 = "067yq55vv1slv4xy346px7h329pi14abdn04chg6s1s6hmf6c1x9";
+      })
+      (fetchpatch {
+        url = https://github.com/dezgeg/u-boot/commit/rpi-2017-11-patch2.patch;
+        sha256 = "0bbw0q027xvzvdxxvpzjajg4rm30a8mb7z74b6ma9q0l7y7bi0c4";
+      })
+      (fetchpatch {
+        url = https://github.com/dezgeg/u-boot/commit/extlinux-path-length-2018-03.patch;
+        sha256 = "07jafdnxvqv8lz256qy29agjc2k1zj5ad4k28r1w5qkhwj4ixmf8";
+      })
+    ];
   };
 
   ubootOrangePiPc = buildUBoot rec {
